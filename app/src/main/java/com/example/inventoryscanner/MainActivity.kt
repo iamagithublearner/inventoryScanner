@@ -11,8 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -143,7 +143,7 @@ private fun AddItemScreen(onBack: () -> Unit, onSave: (InventoryItem) -> Unit, i
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 22.dp)) {
             Spacer(Modifier.height(16.dp))
-            IconButton(onClick = onBack, modifier = Modifier.size(44.dp).background(Color.White, CircleShape)) { Icon(Icons.Default.ArrowBack, "Back", tint = ink) }
+            IconButton(onClick = onBack, modifier = Modifier.size(44.dp).background(Color.White, CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = ink) }
             Spacer(Modifier.height(18.dp))
             Text("ADD TO INVENTORY", color = green, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
             Text("Scan your item", color = ink, fontSize = 27.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
