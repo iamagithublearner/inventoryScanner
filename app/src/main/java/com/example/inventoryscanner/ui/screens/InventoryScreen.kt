@@ -33,10 +33,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.Flow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,8 +48,8 @@ import androidx.compose.ui.unit.sp
 import com.example.inventoryscanner.model.InventoryItem
 
 @Composable
-fun InventoryScreen() {
-    var items by remember { mutableStateOf(emptyList<InventoryItem>()) }
+fun InventoryScreen(items: Flow<List<InventoryItem>>, onSave: (InventoryItem) -> Unit) {
+    val inventoryItems by items.collectAsState(initial = emptyList())
     var query by remember { mutableStateOf("") }
     var adding by remember { mutableStateOf(false) }
     val ink = Color(0xFF17211D)
@@ -58,7 +60,7 @@ fun InventoryScreen() {
     if (adding) {
         AddItemScreen(
             onBack = { adding = false },
-            onSave = { item -> items = listOf(item) + items; adding = false },
+            onSave = { item -> onSave(item); adding = false },
             ink = ink, muted = muted, green = green, bg = bg
         )
         return
@@ -96,11 +98,11 @@ fun InventoryScreen() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("ITEMS", color = muted, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp)
                 Spacer(Modifier.width(8.dp))
-                Text("${items.size}", color = green, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                Text("${inventoryItems.size}", color = green, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.background(Color(0xFFE4EEE7), CircleShape).padding(horizontal = 9.dp, vertical = 4.dp))
             }
             Spacer(Modifier.height(12.dp))
-            val filtered = items.filter { item ->
+            val filtered = inventoryItems.filter { item ->
                 listOf(item.name, item.tags, item.barcode, item.rfidId, item.description).any { it.contains(query, ignoreCase = true) }
             }
             if (filtered.isEmpty()) {
