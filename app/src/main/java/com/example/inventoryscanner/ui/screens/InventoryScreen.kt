@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +45,9 @@ import kotlinx.coroutines.flow.Flow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,10 +58,16 @@ fun InventoryScreen(items: Flow<List<InventoryItem>>, onSave: (InventoryItem) ->
     val inventoryItems by items.collectAsState(initial = emptyList())
     var query by remember { mutableStateOf("") }
     var adding by remember { mutableStateOf(false) }
+    var readerSetup by remember { mutableStateOf(false) }
     val ink = Color(0xFF17211D)
     val muted = Color(0xFF75817B)
     val green = Color(0xFF286B50)
     val bg = Color(0xFFF6F7F3)
+
+    if (readerSetup) {
+        ReaderSetupScreen(onBack = { readerSetup = false })
+        return
+    }
 
     if (adding) {
         AddItemScreen(
@@ -84,6 +96,8 @@ fun InventoryScreen(items: Flow<List<InventoryItem>>, onSave: (InventoryItem) ->
             Spacer(Modifier.height(10.dp))
             Text("Your inventory", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text("Keep track of what you own and where it is.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(18.dp))
+            ReaderConnectionCard(onClick = { readerSetup = true }, green = green)
             Spacer(Modifier.height(24.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(),
@@ -131,6 +145,64 @@ fun InventoryScreen(items: Flow<List<InventoryItem>>, onSave: (InventoryItem) ->
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ReaderConnectionCard(onClick: () -> Unit, green: Color) {
+    Card(onClick = onClick, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F0E9))) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("BT", color = green, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text("Connect RFID reader", color = Color(0xFF17211D), fontWeight = FontWeight.SemiBold)
+                Text("Zebra RFD8500 · Bluetooth", color = Color(0xFF75817B), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+            }
+            Text("›", color = green, fontSize = 24.sp)
+        }
+    }
+}
+
+@Composable
+private fun ReaderSetupScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val ink = Color(0xFF17211D)
+    val muted = Color(0xFF75817B)
+    val green = Color(0xFF286B50)
+    val bg = Color(0xFFF6F7F3)
+    Scaffold(containerColor = bg) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp)
+        ) {
+            Spacer(Modifier.height(18.dp))
+            TextButton(onClick = onBack) { Text("‹  Inventory", color = green) }
+            Spacer(Modifier.height(14.dp))
+            Text("RFID READER", color = green, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text("Connect your RFD8500", color = ink, fontSize = 27.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 7.dp))
+            Text("Pair the reader with this TC21 over Bluetooth.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+            Spacer(Modifier.height(22.dp))
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text("Bluetooth", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Supported for the RFD8500. Pair it in Android settings, then return here to connect through Zebra's RFID SDK.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                    Button(
+                        onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = green)
+                    ) { Text("Open Bluetooth settings") }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFEDEFEA))) {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text("USB", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Unavailable for the RFD8500 in Zebra's current Android SDK connection guide. Use Bluetooth for this reader.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("The Zebra SDK package is not included in this project yet. Reader discovery, SDK connection, tag scanning, and Find mode will become active once that AAR is added.", color = muted, fontSize = 12.sp)
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
