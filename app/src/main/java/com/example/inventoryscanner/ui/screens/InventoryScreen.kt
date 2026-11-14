@@ -1,5 +1,8 @@
 package com.example.inventoryscanner.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +38,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.example.inventoryscanner.data.ZebraReaderController
+import com.example.inventoryscanner.data.ZebraReaderOption
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -166,6 +177,51 @@ private fun ReaderConnectionCard(onClick: () -> Unit, green: Color) {
 @Composable
 private fun ReaderSetupScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val readerController = remember(context) { ZebraReaderController(context) }
+    var readerOptions by remember { mutableStateOf(emptyList<ZebraReaderOption>()) }
+    var selectedReaderId by remember { mutableStateOf<String?>(null) }
+    var isConnected by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(readerController) {
+        onDispose { readerController.close() }
+    }
+
+    fun discoverReaders() {
+        scope.launch {
+            isLoading = true
+            status = "Searching for paired RFD8500 readers…"
+            try {
+                readerOptions = readerController.discover()
+                selectedReaderId = readerOptions.firstOrNull()?.id
+                status = if (readerOptions.isEmpty()) {
+                    "No paired RFD8500 found. Pair it in Bluetooth settings, then scan again."
+                } else "Found ${readerOptions.size} paired RFD8500 reader${if (readerOptions.size == 1) "" else "s"}."
+            } catch (error: Exception) {
+                status = error.message ?: "Reader discovery failed. Check Bluetooth permission and try again."
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+        if (results.values.all { it }) discoverReaders()
+        else status = "Bluetooth permissions are required to discover the RFD8500."
+    }
+
+    fun scanForReaders() {
+        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else emptyArray()
+        val missing = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) discoverReaders() else permissionLauncher.launch(missing.toTypedArray())
+    }
+
     val ink = Color(0xFF17211D)
     val muted = Color(0xFF75817B)
     val green = Color(0xFF286B50)
@@ -191,8 +247,65 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = green)
                     ) { Text("Open Bluetooth settings") }
+                    Button(
+                        onClick = { scanForReaders() },
+                        enabled = !isLoading && !isConnected,
+                        modifier = Modifier.fillMaxWidth().padding(top = 9.dp).height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = green)
+                    ) { Text(if (isLoading) "Searching…" else "Find paired RFD8500") }
                 }
             }
+            if (readerOptions.isNotEmpty() && !isConnected) {
+                Spacer(Modifier.height(12.dp))
+                readerOptions.forEach { option ->
+                    Card(
+                        onClick = { selectedReaderId = option.id },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (selectedReaderId == option.id) Color(0xFFE8F0E9) else Color.White)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Text(option.name, color = ink, fontWeight = FontWeight.SemiBold)
+                            if (option.serialNumber.isNotBlank()) Text("Serial ${option.serialNumber}", color = muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                Button(
+                    onClick = {
+                        val id = selectedReaderId ?: return@Button
+                        scope.launch {
+                            isLoading = true
+                            status = "Connecting to reader…"
+                            status = readerController.connect(id)
+                            isConnected = status?.startsWith("Connected to") == true
+                            isLoading = false
+                        }
+                    },
+                    enabled = selectedReaderId != null && !isLoading,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = green)
+                ) { Text("Connect") }
+            }
+            if (isConnected) {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isLoading = true
+                            status = readerController.disconnect()
+                            isConnected = false
+                            isLoading = false
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8A3932))
+                ) { Text("Disconnect reader") }
+            }
+            status?.let { Text(it, color = if (it.startsWith("Connected to")) green else muted, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
             Spacer(Modifier.height(12.dp))
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFEDEFEA))) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
@@ -201,7 +314,7 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("The Zebra SDK package is not included in this project yet. Reader discovery, SDK connection, tag scanning, and Find mode will become active once that AAR is added.", color = muted, fontSize = 12.sp)
+            Text("Discovery and Bluetooth connection use Zebra's RFID SDK. RFID tag capture and Find mode are the next integration steps.", color = muted, fontSize = 12.sp)
             Spacer(Modifier.height(28.dp))
         }
     }

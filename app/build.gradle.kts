@@ -37,6 +37,9 @@ android {
 }
 
 dependencies {
+    // The ZIOTC/LLRP AAR is an alternative SDK bundle and duplicates classes/namespaces
+    // from rfidapi3lib. This app uses the RFD8500 handheld RFID API over Bluetooth.
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "rfidapi3lib-*.aar"))))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
