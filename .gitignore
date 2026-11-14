@@ -1,0 +1,34 @@
+# Built application files & packages
+*.apk
+*.aar
+*.aab
+
+# Gradle files & caches
+.gradle/
+/build
+/app/build
+
+# Local configuration files (SDK path, local credentials)
+local.properties
+
+# IDE settings (Android Studio / IntelliJ)
+.idea/
+*.iml
+
+# Keystores & Signing secrets
+*.jks
+*.keystore
+*.pepk
+*.p12
+
+# OS / System files
+.DS_Store
+Thumbs.db
+
+# Native build artifacts
+.externalNativeBuild/
+.cxx/
+
+# Profiling & Captures
+captures/
+*.log
