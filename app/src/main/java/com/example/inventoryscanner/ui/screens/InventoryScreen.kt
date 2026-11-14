@@ -1,7 +1,13 @@
 package com.example.inventoryscanner.ui.screens
 
 import android.Manifest
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.pm.PackageManager
+import android.content.Context
+import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -184,9 +190,34 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
     var isConnected by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    var usbStatus by remember { mutableStateOf<String?>(null) }
+    var usbReady by remember { mutableStateOf(false) }
+    val usbManager = remember(context) { context.getSystemService(Context.USB_SERVICE) as UsbManager }
+    val usbPermissionAction = remember(context) { "${context.packageName}.USB_PERMISSION" }
 
     DisposableEffect(readerController) {
         onDispose { readerController.close() }
+    }
+
+    DisposableEffect(usbManager, usbPermissionAction) {
+        val usbPermissionReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != usbPermissionAction) return
+                val device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                usbReady = granted
+                usbStatus = if (granted) {
+                    "USB access granted${device?.productName?.let { " for $it" }.orEmpty()}. Configure the RFD8500 for USB HID to send tag IDs."
+                } else "USB permission was denied."
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            usbPermissionReceiver,
+            IntentFilter(usbPermissionAction),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose { context.unregisterReceiver(usbPermissionReceiver) }
     }
 
     fun discoverReaders() {
@@ -220,6 +251,26 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isEmpty()) discoverReaders() else permissionLauncher.launch(missing.toTypedArray())
+    }
+
+    fun connectUsbReader() {
+        val device = usbManager.deviceList.values.firstOrNull { it.vendorId == ZEBRA_USB_VENDOR_ID }
+        if (device == null) {
+            usbReady = false
+            usbStatus = "No Zebra USB device found. Connect the RFD8500 to the TC21 with a USB host/OTG adapter."
+        } else if (usbManager.hasPermission(device)) {
+            usbReady = true
+            usbStatus = "USB access is ready${device.productName?.let { " for $it" }.orEmpty()}. Configure the RFD8500 for USB HID to send tag IDs."
+        } else {
+            val permissionIntent = PendingIntent.getBroadcast(
+                context,
+                USB_PERMISSION_REQUEST_CODE,
+                Intent(usbPermissionAction).setPackage(context.packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            usbManager.requestPermission(device, permissionIntent)
+            usbStatus = "Waiting for USB permission…"
+        }
     }
 
     val ink = Color(0xFF17211D)
@@ -309,8 +360,15 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFEDEFEA))) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                    Text("USB", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Text("Unavailable for the RFD8500 in Zebra's current Android SDK connection guide. Use Bluetooth for this reader.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("USB HID", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text("The RFD8500 can send RFID reads over USB HID. In this mode, tag IDs arrive as keyboard input; focus the RFID ID field before pressing the reader trigger. Configure USB HID on the reader first.", color = muted, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                    Button(
+                        onClick = { connectUsbReader() },
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = green)
+                    ) { Text(if (usbReady) "Check USB reader" else "Connect USB reader") }
+                    usbStatus?.let { Text(it, color = if (usbReady) green else muted, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp)) }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -319,6 +377,9 @@ private fun ReaderSetupScreen(onBack: () -> Unit) {
         }
     }
 }
+
+private const val ZEBRA_USB_VENDOR_ID = 0x05E0
+private const val USB_PERMISSION_REQUEST_CODE = 8500
 
 @Composable
 private fun SmallPill(label: String, green: Color) {

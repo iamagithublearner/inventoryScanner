@@ -4,6 +4,7 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <!-- Zebra RFID SDK permissions for Bluetooth reader (e.g. RFD8500) discovery and connection -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
