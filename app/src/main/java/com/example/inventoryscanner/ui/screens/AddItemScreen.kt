@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -85,7 +88,14 @@ fun AddItemScreen(
             }
         }
     }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 22.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 22.dp)
+        ) {
             Spacer(Modifier.height(16.dp))
             IconButton(onClick = onBack, modifier = Modifier.size(44.dp).background(Color.White, CircleShape)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = ink) }
             Spacer(Modifier.height(18.dp))
@@ -112,6 +122,7 @@ fun AddItemScreen(
             FormField("Barcode", barcode, { barcode = it }, "Scanned barcode value", false)
             FormField("RFID ID", rfid, { rfid = it }, "Scan or enter tag ID", false)
             FormField("Description", description, { description = it }, "Notes about this item", false, singleLine = false)
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
